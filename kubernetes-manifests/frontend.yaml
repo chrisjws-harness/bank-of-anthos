@@ -18,6 +18,8 @@ kind: Deployment
 metadata:
   name: frontend
 spec:
+  imagePullSecrets:
+      - name: ecr-dockercfg
   selector:
     matchLabels:
       app: frontend
@@ -149,3 +151,13 @@ spec:
     port: 80
     targetPort: 8080
 # [END gke_boa_kubernetes_manifests_frontend_service_frontend]
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ecr-dockercfg
+  annotations:
+    harness.io/skip-versioning: true
+data:
+  .dockercfg: {{.Values.dockercfg}}
+type: kubernetes.io/dockercfg
