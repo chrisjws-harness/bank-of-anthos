@@ -42,7 +42,7 @@ spec:
               - all
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/bank-of-anthos-ci/frontend:v0.5.8
+        image: {{.Values.image}}
         volumeMounts:
         - name: publickey
           mountPath: "/tmp/.ssh"
