@@ -59,8 +59,9 @@ def create_app():
         @wraps(f)
         def wrap(*args, **kwargs):
             g.inc()
-            f(*args, **kwargs)
+            response = f(*args, **kwargs)
             g.dec()
+            return response
 
         return wrap
 
