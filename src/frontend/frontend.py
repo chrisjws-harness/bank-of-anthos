@@ -39,6 +39,11 @@ from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.instrumentation.jinja2 import Jinja2Instrumentor
 
+from prometheus_client import start_http_server, Summary, Gauge
+import time
+import random
+from functools import wraps
+
 
 # pylint: disable-msg=too-many-locals
 def create_app():
@@ -47,10 +52,24 @@ def create_app():
     """
     app = Flask(__name__)
 
+    request_time = Summary('request_processing_seconds', 'Time spent processing request')
+    g = Gauge('my_inprogress_requests', 'Description of gauge')
+
+    def in_progress(f):
+        @wraps(f)
+        def wrap(*args, **kwargs):
+            g.inc()
+            f(*args, **kwargs)
+            g.dec()
+
+        return wrap
+
     # Disabling unused-variable for lines with route decorated functions
     # as pylint thinks they are unused
     # pylint: disable=unused-variable
     @app.route('/version', methods=['GET'])
+    @request_time.time()
+    @in_progress
     def version():
         """
         Service version endpoint
@@ -73,6 +92,8 @@ def create_app():
         return "Cluster: " + cluster_name + ", Pod: " + pod_name + ", Zone: " + pod_zone, 200
 
     @app.route("/")
+    @request_time.time()
+    @in_progress
     def root():
         """
         Renders home page or login page, depending on authentication status.
@@ -83,6 +104,8 @@ def create_app():
         return home()
 
     @app.route("/home")
+    @request_time.time()
+    @in_progress
     def home():
         """
         Renders home page. Redirects to /login if token is not valid
@@ -177,6 +200,8 @@ def create_app():
                 trans['accountLabel'] = contact_map.get(trans['toAccountNum'])
 
     @app.route('/payment', methods=['POST'])
+    @request_time.time()
+    @in_progress
     def payment():
         """
         Submits payment request to ledgerwriter service
@@ -239,6 +264,8 @@ def create_app():
                                 _scheme=app.config['SCHEME']))
 
     @app.route('/deposit', methods=['POST'])
+    @request_time.time()
+    @in_progress
     def deposit():
         """
         Submits deposit request to ledgerwriter service
@@ -348,6 +375,8 @@ def create_app():
             raise UserWarning(resp.text) from http_request_err
 
     @app.route("/login", methods=['GET'])
+    @request_time.time()
+    @in_progress
     def login_page():
         """
         Renders login page. Redirects to /home if user already has a valid token.
@@ -404,6 +433,8 @@ def create_app():
                                app_name=app_name)
 
     @app.route('/login', methods=['POST'])
+    @request_time.time()
+    @in_progress
     def login():
         """
         Submits login request to userservice and saves resulting token
@@ -451,6 +482,8 @@ def create_app():
                                 _scheme=app.config['SCHEME']))
 
     @app.route("/consent", methods=['GET'])
+    @request_time.time()
+    @in_progress
     def consent_page():
         """Renders consent page.
 
@@ -487,6 +520,8 @@ def create_app():
                                         _scheme=app.config['SCHEME'])))
 
     @app.route('/consent', methods=['POST'])
+    @request_time.time()
+    @in_progress
     def consent():
         """
         Check consent, write cookie if yes, and redirect accordingly
@@ -526,6 +561,8 @@ def create_app():
         return make_response(redirect(redirect_uri + '#error=server_error', 302))
 
     @app.route("/signup", methods=['GET'])
+    @request_time.time()
+    @in_progress
     def signup_page():
         """
         Renders signup page. Redirects to /login if token is not valid
@@ -545,6 +582,8 @@ def create_app():
                                bank_name=os.getenv('BANK_NAME', 'Bank of Anthos'))
 
     @app.route("/signup", methods=['POST'])
+    @request_time.time()
+    @in_progress
     def signup():
         """
         Submits signup request to userservice
@@ -571,6 +610,8 @@ def create_app():
                                 _scheme=app.config['SCHEME']))
 
     @app.route('/logout', methods=['POST'])
+    @request_time.time()
+    @in_progress
     def logout():
         """
         Logs out user by deleting token cookie and redirecting to login page
@@ -688,6 +729,9 @@ def create_app():
     app.logger.handlers = logging.getLogger('gunicorn.error').handlers
     app.logger.setLevel(logging.getLogger('gunicorn.error').level)
     app.logger.info('Starting frontend service.')
+
+    app.logger.info('Starting metrics service.')
+    start_http_server(8000)
 
     # Set up tracing and export spans to Cloud Trace.
     if os.environ['ENABLE_TRACING'] == "true":
