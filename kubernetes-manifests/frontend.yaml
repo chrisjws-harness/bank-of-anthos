@@ -26,6 +26,8 @@ spec:
       labels:
         app: frontend
     spec:
+      imagePullSecrets:
+      - name: ecr-dockercfg
       serviceAccountName: default
       terminationGracePeriodSeconds: 5
       securityContext:
@@ -42,7 +44,7 @@ spec:
               - all
           privileged: false
           readOnlyRootFilesystem: true
-        image: gcr.io/bank-of-anthos-ci/frontend:v0.5.8
+        image: {{.Values.image}}
         volumeMounts:
         - name: publickey
           mountPath: "/tmp/.ssh"
@@ -149,3 +151,13 @@ spec:
     port: 80
     targetPort: 8080
 # [END gke_boa_kubernetes_manifests_frontend_service_frontend]
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ecr-dockercfg
+  annotations:
+    harness.io/skip-versioning: true
+data:
+  .dockercfg: {{.Values.dockercfg}}
+type: kubernetes.io/dockercfg
